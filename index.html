@@ -290,19 +290,25 @@
       const [hoursFromNow, setHoursFromNow] = useState(24);
       const [subtasks, setSubtasks] = useState(['']);
 
-      // 새로 바뀐 뇌: 네모칸의 글자를 진짜 블록으로 굳히는 역할
       const saveNewSubtask = (taskId) => {
-        if (newSubtaskTitle.trim()) {
-          setTasks(tasks.map(task => {
-            if (task.id === taskId) {
-              return {
-                ...task,
-                subtasks: [...task.subtasks, { id: `sub-${Date.now()}`, title: newSubtaskTitle, completed: false }]
-              };
-            }
-            return task;
-          }));
+        // 빈칸이거나 스페이스바만 쳤을 땐 그냥 닫아버림
+        if (!newSubtaskTitle || !newSubtaskTitle.trim()) {
+          setAddingSubtaskTo(null);
+          return;
         }
+
+        // prevTasks를 통해 무조건 '가장 최신'의 데이터를 가져와서 조립함
+        setTasks(prevTasks => prevTasks.map(task => {
+          if (task.id === taskId) {
+            return {
+              ...task,
+              // 과거 데이터라 subtasks 배열이 아예 없더라도 빈 배열([])을 임시로 만들어 에러를 막음
+              subtasks: [...(task.subtasks || []), { id: `sub-${Date.now()}-${Math.random()}`, title: newSubtaskTitle, completed: false }]
+            };
+          }
+          return task;
+        }));
+
         setAddingSubtaskTo(null); // 입력창 닫기
         setNewSubtaskTitle('');   // 글자 비우기
       };
