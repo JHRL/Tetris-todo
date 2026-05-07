@@ -132,6 +132,21 @@
         setIsAddingTask(false);
       };
 
+      const handleAddSubtask = (taskId) => {
+        const title = prompt('새로 생각난 세부 작업을 입력하세요:');
+        if (!title || !title.trim()) return;
+
+        setTasks(tasks.map(task => {
+          if (task.id === taskId) {
+            return {
+              ...task,
+              subtasks: [...task.subtasks, { id: `sub-${Date.now()}`, title, completed: false }]
+            };
+          }
+          return task;
+        }));
+      };
+
       const formatTimeRemaining = (deadline) => {
         const diff = deadline - currentTime;
         if (diff <= 0) return '마감됨';
@@ -213,6 +228,12 @@
                             ))}
                           </div>
                         )}
+                        <button
+                          onClick={() => handleAddSubtask(task.id)}
+                          className={`w-full mt-2 py-1.5 rounded-lg border border-dashed border-current opacity-40 hover:opacity-100 transition-opacity text-xs font-bold flex justify-center items-center gap-1`}
+                        >
+                          <PlusIcon /> 새로 추가
+                        </button>
                       </div>
                     );
                   })}
