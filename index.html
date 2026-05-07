@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>파스텔 테트리스</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel CDN (브라우저에서 JSX를 바로 해석하기 위함) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* 옵시디언 내부에서 스크롤바가 너무 투박해 보이지 않도록 미세 조정 */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background-color: #d4d4d8; border-radius: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+  </style>
+</head>
+<body class="bg-stone-50 m-0 p-0">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // 부드러운 파스텔톤 블록 색상 배열
+    const PASTEL_COLORS = [
+      { main: 'bg-rose-100', border: 'border-rose-300', text: 'text-rose-900', sub: 'bg-white/60', subHover: 'hover:bg-white/90' },
+      { main: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-900', sub: 'bg-white/60', subHover: 'hover:bg-white/90' },
+      { main: 'bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-900', sub: 'bg-white/60', subHover: 'hover:bg-white/90' },
+      { main: 'bg-amber-100', border: 'border-amber-300', text: 'text-amber-900', sub: 'bg-white/60', subHover: 'hover:bg-white/90' },
+      { main: 'bg-purple-100', border: 'border-purple-300', text: 'text-purple-900', sub: 'bg-white/60', subHover: 'hover:bg-white/90' },
+    ];
+
+    const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
+    const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>;
+    const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
+
+    const generateSampleTasks = () => {
+      const now = Date.now();
+      return [
+        {
+          id: 'task-1',
+          title: '프로젝트 기획안 작성',
+          deadline: now + 24 * 60 * 60 * 1000,
+          colorIndex: 0,
+          lane: 0,
+          subtasks: [
+            { id: 'sub-1-1', title: '시장 조사', completed: false },
+            { id: 'sub-1-2', title: '초안 작성', completed: false }
+          ]
+        },
+        {
+          id: 'task-2',
+          title: '회의 준비 (긴급)',
+          deadline: now + 2 * 60 * 60 * 1000, 
+          colorIndex: 3,
+          lane: 1,
+          subtasks: [
+            { id: 'sub-2-1', title: '아젠다 정리', completed: false }
+          ]
+        },
+        {
+          id: 'task-3',
+          title: '주간 업무 보고',
+          deadline: now + 48 * 60 * 60 * 1000,
+          colorIndex: 1,
+          lane: 2,
+          subtasks: [
+            { id: 'sub-3-1', title: '데이터 취합', completed: false },
+            { id: 'sub-3-2', title: 'PPT 작성', completed: false },
+            { id: 'sub-3-3', title: '팀장님 리뷰', completed: false }
+          ]
+        }
+      ];
+    };
+
+    function App() {
+      const [tasks, setTasks] = useState(() => {
+        try {
+          const saved = localStorage.getItem('tetris-tasks');
+          if (saved) return JSON.parse(saved);
+        } catch (e) {
+          console.error("Failed to parse local storage", e);
+        }
+        return generateSampleTasks();
+      });
+
+      const [currentTime, setCurrentTime] = useState(Date.now());
+      const [isAddingTask, setIsAddingTask] = useState(false);
+
+      useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(Date.now()), 60000);
+        return () => clearInterval(timer);
+      }, []);
+
+      useEffect(() => {
+        localStorage.setItem('tetris-tasks', JSON.stringify(tasks));
+      }, [tasks]);
+
+      const toggleSubtask = (taskId, subtaskId) => {
+        setTasks(tasks.map(task => {
+          if (task.id === taskId) {
+            return {
+              ...task,
+              subtasks: task.subtasks.map(sub => 
+                sub.id === subtaskId ? { ...sub, completed: true } : sub
+              )
+            };
+          }
+          return task;
+        }));
+      };
+
+      const completeTask = (taskId) => {
+        setTasks(tasks.filter(task => task.id !== taskId));
+      };
+
+      const addTask = (newTask) => {
+        const targetLane = [0, 1, 2].reduce((minLane, currentLane) => {
+          const minCount = tasks.filter(t => t.lane === minLane).length;
+          const currentCount = tasks.filter(t => t.lane === currentLane).length;
+          return currentCount < minCount ? currentLane : minLane;
+        }, 0);
+
+        setTasks([...tasks, { ...newTask, id: `task-${Date.now()}`, lane: targetLane }]);
+        setIsAddingTask(false);
+      };
+
+      const formatTimeRemaining = (deadline) => {
+        const diff = deadline - currentTime;
+        if (diff <= 0) return '마감됨';
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const mins = Math.floor((diff / (1000 * 60)) % 60);
+        if (hours > 24) return `${Math.floor(hours / 24)}일 남음`;
+        if (hours > 0) return `${hours}시간 남음`;
+        return `${mins}분 남음`;
+      };
+
+      return (
+        <div className="bg-stone-50 text-neutral-800 p-4 font-sans flex flex-col h-[100vh] overflow-hidden">
+          {/* 헤더 */}
+          <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-2xl shadow-sm border border-neutral-200 shrink-0">
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-neutral-900 flex items-center gap-2">
+                <span className="text-2xl">🧱</span> 파스텔 테트리스
+              </h1>
+              <p className="text-sm text-neutral-500 mt-1">블록 안의 세부작업을 완료해 블록을 얇게 만드세요!</p>
+            </div>
+            <button 
+              onClick={() => setIsAddingTask(true)}
+              className="flex items-center gap-1 bg-neutral-800 hover:bg-neutral-900 text-white px-4 py-2 rounded-full text-sm font-medium transition-all shadow-sm active:scale-95"
+            >
+              <PlusIcon /> 추가
+            </button>
+          </div>
+
+          {/* 게임 영역 */}
+          <div className="flex-1 grid grid-cols-3 gap-3 bg-white p-3 rounded-2xl shadow-inner border-2 border-neutral-200 overflow-hidden isolate relative">
+            {[0, 1, 2].map(lane => {
+              const laneTasks = tasks
+                .filter(t => t.lane === lane)
+                .sort((a, b) => a.deadline - b.deadline);
+
+              return (
+                <div key={lane} className="flex flex-col-reverse gap-3 h-full overflow-y-auto pr-1 pb-1">
+                  {laneTasks.map(task => {
+                    const colorTheme = PASTEL_COLORS[task.colorIndex % PASTEL_COLORS.length];
+                    const uncompletedSubtasks = task.subtasks.filter(sub => !sub.completed);
+                    const isOverdue = task.deadline <= currentTime;
+
+                    return (
+                      <div
+                        key={task.id}
+                        className={`w-full p-2.5 rounded-xl border-2 transition-all duration-300 ease-in-out shrink-0 flex flex-col gap-2 ${colorTheme.main} ${colorTheme.border} shadow-sm ${isOverdue ? 'animate-pulse ring-2 ring-red-400' : ''}`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 pr-2">
+                            <h3 className={`font-bold text-sm leading-tight break-words ${colorTheme.text}`}>
+                              {task.title}
+                            </h3>
+                            <span className={`inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isOverdue ? 'bg-red-500 text-white' : 'bg-white/50 text-neutral-600'}`}>
+                              {formatTimeRemaining(task.deadline)}
+                            </span>
+                          </div>
+                          <button 
+                            onClick={() => completeTask(task.id)}
+                            className={`p-1.5 rounded-lg opacity-40 hover:opacity-100 hover:bg-white/50 transition-all ${colorTheme.text} shrink-0`}
+                            title="블록 전체 치우기"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+
+                        {uncompletedSubtasks.length > 0 && (
+                          <div className="flex flex-col gap-1.5 mt-1">
+                            {uncompletedSubtasks.map((subtask) => (
+                              <button
+                                key={subtask.id}
+                                onClick={() => toggleSubtask(task.id, subtask.id)}
+                                className={`w-full text-left px-2.5 py-2 rounded-lg border border-white/40 shadow-sm text-xs font-semibold text-neutral-700 transition-all flex justify-between items-center group ${colorTheme.sub} ${colorTheme.subHover}`}
+                              >
+                                <span className="truncate">{subtask.title}</span>
+                                <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 p-1 rounded-full text-neutral-600">
+                                  <CheckIcon />
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            
+            {tasks.length === 0 && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-300 pointer-events-none">
+                <span className="text-5xl mb-4">✨</span>
+                <p className="font-bold text-lg">모든 할 일을 치웠습니다!</p>
+              </div>
+            )}
+          </div>
+
+          {isAddingTask && (
+            <AddTaskModal 
+              onClose={() => setIsAddingTask(false)} 
+              onAdd={addTask} 
+            />
+          )}
+        </div>
+      );
+    }
+
+    function AddTaskModal({ onClose, onAdd }) {
+      const [title, setTitle] = useState('');
+      const [hoursFromNow, setHoursFromNow] = useState(24);
+      const [subtasks, setSubtasks] = useState(['']);
+
+      const handleAdd = (e) => {
+        e.preventDefault();
+        if (!title.trim()) return;
+
+        const filteredSubtasks = subtasks
+          .filter(s => s.trim())
+          .map(s => ({ id: `sub-${Date.now()}-${Math.random()}`, title: s, completed: false }));
+
+        onAdd({
+          title,
+          deadline: Date.now() + (hoursFromNow * 60 * 60 * 1000),
+          colorIndex: Math.floor(Math.random() * PASTEL_COLORS.length),
+          subtasks: filteredSubtasks
+        });
+      };
+
+      const updateSubtask = (index, value) => {
+        const newSubs = [...subtasks];
+        newSubs[index] = value;
+        setSubtasks(newSubs);
+      };
+
+      const addSubtaskField = () => setSubtasks([...subtasks, '']);
+      const removeSubtaskField = (index) => setSubtasks(subtasks.filter((_, i) => i !== index));
+
+      return (
+        <div className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50">
+              <h2 className="text-lg font-bold text-neutral-800">새 블록 떨어뜨리기</h2>
+              <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600 font-bold p-1">&times;</button>
+            </div>
+            
+            <form onSubmit={handleAdd} className="p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
+              <div>
+                <label className="block text-xs font-bold text-neutral-500 mb-1">작업명 (큰 블록)</label>
+                <input 
+                  type="text" 
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="프로젝트 이름 등"
+                  className="w-full border-2 border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-800 transition-colors bg-neutral-50 focus:bg-white"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-500 mb-1">마감 기한 (지금부터)</label>
+                <div className="flex gap-2 items-center">
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="720"
+                    value={hoursFromNow}
+                    onChange={e => setHoursFromNow(Number(e.target.value))}
+                    className="w-24 border-2 border-neutral-200 rounded-xl px-3 py-2 outline-none focus:border-neutral-800 transition-colors bg-neutral-50 focus:bg-white text-center"
+                  />
+                  <span className="text-sm font-semibold text-neutral-600">시간 뒤</span>
+                </div>
+                <p className="text-[10px] text-neutral-400 mt-1">임박할수록 바닥(아래)에 가깝게 쌓입니다.</p>
+              </div>
+
+              <div className="bg-neutral-50 p-3 rounded-xl border border-neutral-100">
+                <label className="block text-xs font-bold text-neutral-500 mb-2">세부 작업 (블록 내부 칸)</label>
+                <div className="flex flex-col gap-2">
+                  {subtasks.map((sub, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={sub}
+                        onChange={e => updateSubtask(index, e.target.value)}
+                        placeholder={`세부 할 일 ${index + 1}`}
+                        className="flex-1 border border-neutral-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-neutral-400"
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => removeSubtaskField(index)}
+                        className="px-2 text-neutral-400 hover:text-red-500 bg-white border border-neutral-200 rounded-lg"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+                <button 
+                  type="button" 
+                  onClick={addSubtaskField}
+                  className="mt-2 text-xs text-neutral-600 bg-white border border-neutral-200 w-full py-2 rounded-lg hover:bg-neutral-100 transition-colors font-semibold flex items-center justify-center gap-1"
+                >
+                  <PlusIcon /> 세부 칸 추가하기
+                </button>
+              </div>
+
+              <button 
+                type="submit" 
+                className="w-full bg-neutral-800 hover:bg-neutral-900 text-white font-bold py-3 rounded-xl transition-all active:scale-[0.98] mt-2"
+              >
+                블록 생성
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
