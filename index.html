@@ -93,6 +93,8 @@
 
       const [currentTime, setCurrentTime] = useState(Date.now());
       const [isAddingTask, setIsAddingTask] = useState(false);
+      const [addingSubtaskTo, setAddingSubtaskTo] = useState(null);
+      const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
       useEffect(() => {
         const timer = setInterval(() => setCurrentTime(Date.now()), 60000);
@@ -228,12 +230,36 @@
                             ))}
                           </div>
                         )}
-                        <button
-                          onClick={() => handleAddSubtask(task.id)}
-                          className={`w-full mt-2 py-1.5 rounded-lg border border-dashed border-current opacity-40 hover:opacity-100 transition-opacity text-xs font-bold flex justify-center items-center gap-1`}
+                        {/* 교체할 영역: 버튼 누르면 입력창으로 변신함 */}
+                    {addingSubtaskTo === task.id ? (
+                      <div className="mt-2 flex gap-1 items-center bg-white/70 p-1 rounded-lg border-2 border-neutral-300 shadow-inner">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={newSubtaskTitle}
+                          onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                          onKeyDown={(e) => { 
+                            if (e.key === 'Enter') saveNewSubtask(task.id); 
+                            if (e.key === 'Escape') setAddingSubtaskTo(null); 
+                          }}
+                          placeholder="할 일 입력 후 엔터"
+                          className="flex-1 bg-transparent text-xs font-bold outline-none px-1 text-neutral-800 placeholder-neutral-400"
+                        />
+                        <button 
+                          onClick={() => saveNewSubtask(task.id)} 
+                          className="text-[10px] font-bold bg-neutral-800 hover:bg-neutral-900 text-white px-2 py-1.5 rounded transition-colors"
                         >
-                          <PlusIcon /> 새로 추가
+                          저장
                         </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setAddingSubtaskTo(task.id); setNewSubtaskTitle(''); }}
+                        className={`w-full mt-2 py-1.5 rounded-lg border border-dashed border-current opacity-40 hover:opacity-100 transition-opacity text-xs font-bold flex justify-center items-center gap-1`}
+                      >
+                        <PlusIcon /> 새로 추가
+                      </button>
+                    )}
                       </div>
                     );
                   })}
@@ -264,20 +290,21 @@
       const [hoursFromNow, setHoursFromNow] = useState(24);
       const [subtasks, setSubtasks] = useState(['']);
 
-      const handleAdd = (e) => {
-        e.preventDefault();
-        if (!title.trim()) return;
-
-        const filteredSubtasks = subtasks
-          .filter(s => s.trim())
-          .map(s => ({ id: `sub-${Date.now()}-${Math.random()}`, title: s, completed: false }));
-
-        onAdd({
-          title,
-          deadline: Date.now() + (hoursFromNow * 60 * 60 * 1000),
-          colorIndex: Math.floor(Math.random() * PASTEL_COLORS.length),
-          subtasks: filteredSubtasks
-        });
+      // 새로 바뀐 뇌: 네모칸의 글자를 진짜 블록으로 굳히는 역할
+      const saveNewSubtask = (taskId) => {
+        if (newSubtaskTitle.trim()) {
+          setTasks(tasks.map(task => {
+            if (task.id === taskId) {
+              return {
+                ...task,
+                subtasks: [...task.subtasks, { id: `sub-${Date.now()}`, title: newSubtaskTitle, completed: false }]
+              };
+            }
+            return task;
+          }));
+        }
+        setAddingSubtaskTo(null); // 입력창 닫기
+        setNewSubtaskTitle('');   // 글자 비우기
       };
 
       const updateSubtask = (index, value) => {
